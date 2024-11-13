@@ -1,0 +1,62 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "/var/home/hawkowl/code/flipclockwch/include",
+                "/var/home/hawkowl/code/flipclockwch/src",
+                "/var/home/hawkowl/code/flipclockwch/.pio/libdeps/genericCH32V003F4P6/Stepper/src",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/ch32v003fun/ch32v003fun",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino/api/deprecated",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino/api/deprecated-avr-comp",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino/hal",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/variants/CH32V003",
+                "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/libraries/Wire/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/var/home/hawkowl/code/flipclockwch/include",
+                    "/var/home/hawkowl/code/flipclockwch/src",
+                    "/var/home/hawkowl/code/flipclockwch/.pio/libdeps/genericCH32V003F4P6/Stepper/src",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/ch32v003fun/ch32v003fun",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino/api/deprecated",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino/api/deprecated-avr-comp",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/cores/arduino/hal",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/variants/CH32V003",
+                    "/home/hawkowl/.platformio/packages/framework-arduinoch32v003/libraries/Wire/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60116",
+                "CH32V003F4",
+                "CH32V00X",
+                "CH32V00x",
+                "CH32V003",
+                "TINYVECTOR",
+                "CPLUSPLUS",
+                "ARDUINO_ARCH_WCH",
+                "ARDUINO=10808",
+                ""
+            ],
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++17",
+            "compilerPath": "/home/hawkowl/.platformio/packages/toolchain-riscv/bin/riscv-none-embed-gcc",
+            "compilerArgs": [
+                "-march=rv32ecxw",
+                "-mabi=ilp32e",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}

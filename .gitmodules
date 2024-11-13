@@ -1,3 +1,0 @@
-[submodule "external/Stepper"]
-	path = external/Stepper
-	url = https://github.com/arduino-libraries/Stepper.git
