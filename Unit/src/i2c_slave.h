@@ -33,6 +33,10 @@
 
 #include "ch32v003fun.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void (*i2c_write_callback_t)(uint8_t reg, uint8_t length);
 typedef void (*i2c_read_callback_t)(uint8_t reg);
 
@@ -234,5 +238,9 @@ void I2C1_ER_IRQHandler(void) {
     I2C1->STAR1 &= ~(I2C_STAR1_AF);  // Clear error
   }
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
