@@ -3,33 +3,33 @@
 #include <Arduino.h>
 #include <Stepper.h>
 #include <ch32v003fun.h>
-#include <i2c_slave.h>
+// #include <i2c_slave.h>
 #include <stdio.h>
 
-#define SERIAL_ENABLE  // uncomment for serial debug communication
-// #define TEST_ENABLE
-//   uncomment for Test mode. Rotates through a few character
-//   to make sure unit is working. These characters should be
-//   displayed in the correct order: " ", "Z", "A", "U", "N",
-//   "?", "0", "1", "2", "9"
+// #define SERIAL_ENABLE  // uncomment for serial debug communication
+#define TEST_ENABLE  // uncomment for Test mode. Rotates through a few character
+                     // to make sure unit is working. These characters should be
+                     // displayed in the correct order: " ", "Z", "A", "U", "N",
+                     // "?", "0", "1", "2", "9"
 
 // Pins of I2C adress switch
-#define ADRESSSW4 PC0
-#define ADRESSSW3 PD6
-#define ADRESSSW2 PD5
-#define ADRESSSW1 PD4
+#define ADRESSSW1 C0
+#define ADRESSSW2 D6
+#define ADRESSSW3 D5
+#define ADRESSSW4 D4
 
 // constants stepper
-#define STEPPERPIN1 PC6
-#define STEPPERPIN2 PC7
-#define STEPPERPIN3 PC3
-#define STEPPERPIN4 PC4
-#define HALLPIN PD7
 
+#define STEPPERPIN1 C6
+#define STEPPERPIN2 C7
+#define STEPPERPIN3 C3
+#define STEPPERPIN4 C4
 #define STEPS 2038  // 28BYJ-48 stepper, number of steps
+#define HALLPIN D7  // Pin of hall sensor
 #define AMOUNTFLAPS 45
 
 // constants others
+#define BAUDRATE 115200
 #define ROTATIONDIRECTION -1  //-1 for reverse direction
 #define OVERHEATINGTIMEOUT \
   2  // timeout in seconds to avoid overheating of stepper-> After starting
@@ -44,12 +44,12 @@ const char* letters[] = {
     " ", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N",
     "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "Ä", "Ö", "Ü",
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ".", "-", "?", "!"};
-Stepper* stepper;
-
-PinStatus lastInd1 = LOW;  // store last status of phase
-PinStatus lastInd2 = LOW;  // store last status of phase
-PinStatus lastInd3 = LOW;  // store last status of phase
-PinStatus lastInd4 = LOW;  // store last status of phase
+Stepper stepper(STEPS, STEPPERPIN1, STEPPERPIN3, STEPPERPIN2,
+                STEPPERPIN4);  // stepper setup
+PinStatus lastInd1 = LOW;      // store last status of phase
+PinStatus lastInd2 = LOW;      // store last status of phase
+PinStatus lastInd3 = LOW;      // store last status of phase
+PinStatus lastInd4 = LOW;      // store last status of phase
 float missedSteps = 0;  // cummulate steps <1, to compensate via additional step
                         // when reaching >1
 int currentlyrotating =
@@ -70,20 +70,6 @@ volatile uint8_t i2c_registers[32] = {0x00};
 
 // setup
 void setup() {
-  funGpioInitAll();
-
-  stepper = new Stepper(STEPS, STEPPERPIN1, STEPPERPIN3, STEPPERPIN2,
-                        STEPPERPIN4);  // stepper setup
-
-  pinMode(STEPPERPIN1, OUTPUT);
-  pinMode(STEPPERPIN2, OUTPUT);
-  pinMode(STEPPERPIN3, OUTPUT);
-  pinMode(STEPPERPIN4, OUTPUT);
-
-#ifdef SERIAL_ENABLE
-  printf("starting unit...\n");
-#endif
-
   // i2c adress switch
   pinMode(ADRESSSW1, INPUT_PULLUP);
   pinMode(ADRESSSW2, INPUT_PULLUP);
@@ -96,11 +82,25 @@ void setup() {
   i2cAddress = getaddress();  // get I2C Address and save in variable
 
 #ifdef SERIAL_ENABLE
-  printf("I2CAddress: %d\n", i2cAddress);
+  // initialize serial
+  Serial.begin(BAUDRATE);
+  Serial.println("starting unit");
+  Serial.print("I2CAddress: ");
+  Serial.println(i2cAddress);
 #endif
 
-  funPinMode(PC1, GPIO_CFGLR_OUT_10Mhz_AF_OD);  // SDA
-  funPinMode(PC2, GPIO_CFGLR_OUT_10Mhz_AF_OD);  // SCL
+  // funPinMode(C1, GPIO_CFGLR_OUT_10Mhz_AF_OD);  // SDA
+  // funPinMode(C2, GPIO_CFGLR_OUT_10Mhz_AF_OD);  // SCL
+
+  // I2C function assignment
+  // Wire.begin(i2cAddress);         // i2c address of this unit
+  // Wire.onReceive(receiveLetter);  // call-function for transfered letter
+  // viai2c Wire.onRequest(requestEvent);   // call-funtion if master requests
+  // unit
+  // state
+  // SetupI2CSlave(i2cAddress, i2c_registers, sizeof(i2c_registers),
+  // receiveLetter,
+  //              NULL, false);
 
   getOffset();      // get calibration offset from EEPROM
   calibrate(true);  // home stepper after startup
@@ -114,9 +114,6 @@ void setup() {
     delay(5000);
   }
 #endif
-
-  SetupI2CSlave(i2cAddress, i2c_registers, sizeof(i2c_registers), receiveLetter,
-                NULL, false);
 }
 
 void loop() {
@@ -125,13 +122,17 @@ void loop() {
     delay(WAIT_TIME);
   }  // end of time to sleep
 
-  previousMillis = millis();  // reset sleep counter
-
+  // check if new letter was received through i2c
   if (displayedLetter != receivedNumber) {
-#ifdef SERIAL_ENABLE
-    printf("Value over serial received: %d Letter: %s @ speed %d\n",
-           receivedNumber, letters[receivedNumber], stepperSpeed);
-#endif
+    /*
+      #ifdef SERIAL_ENABLE
+      Serial.print("Value over serial received: ");
+      Serial.print(receivedNumber);
+      Serial.print(" Letter: ");
+      Serial.print(letters[receivedNumber]);
+      Serial.println();
+      #endif
+    */
     // rotate to new letter
     rotateToLetter(receivedNumber);
   }
@@ -142,7 +143,6 @@ void rotateToLetter(int toLetter) {
   if (lastRotation == 0 ||
       (millis() - lastRotation > OVERHEATINGTIMEOUT * 1000)) {
     lastRotation = millis();
-    printf("millis %d\n", lastRotation);
     // get letter position
     int posLetter = -1;
     posLetter = toLetter;
@@ -150,14 +150,15 @@ void rotateToLetter(int toLetter) {
     posCurrentLetter = displayedLetter;
     // int amountLetters = sizeof(letters) / sizeof(String);
 #ifdef SERIAL_ENABLE
-    printf("go to letter: %s\n", letters[toLetter]);
+    Serial.print("go to letter: ");
+    Serial.println(letters[toLetter]);
 #endif
     // go to letter, but only if available (>-1)
     if (posLetter > -1) {  // check if letter exists
       // check if letter is on higher index, then no full rotaion is needed
       if (posLetter >= posCurrentLetter) {
 #ifdef SERIAL_ENABLE
-        printf("direct\n");
+        Serial.println("direct");
 #endif
         // go directly to next letter, get steps from current letter to target
         // letter
@@ -178,7 +179,7 @@ void rotateToLetter(int toLetter) {
       } else {
         // full rotation is needed, good time for a calibration
 #ifdef SERIAL_ENABLE
-        printf("full rotation incl. calibration\n");
+        Serial.println("full rotation incl. calibration");
 #endif
         calibrate(false);  // calibrate revolver and do not stop motor
         // startMotor();
@@ -202,7 +203,7 @@ void rotateToLetter(int toLetter) {
       stopMotor();
     } else {
 #ifdef SERIAL_ENABLE
-      printf("letter unknown, go to space\n");
+      Serial.println("letter unknown, go to space");
 #endif
       desiredLetter = 0;
     }
@@ -210,10 +211,8 @@ void rotateToLetter(int toLetter) {
 }
 
 void receiveLetter(uint8_t reg, uint8_t length) {
-  printf("Value over i2c\n");
   receivedNumber = i2c_registers[reg];
-  // stepperSpeed = i2c_registers[reg + 1];
-  return;
+  stepperSpeed = i2c_registers[reg + 1];
 }
 
 void requestEvent() {
@@ -223,7 +222,7 @@ void requestEvent() {
     Serial.print("Status ");
     Serial.print(currentlyrotating);
     Serial.print(" sent to master");
-    printf();
+    Serial.println();
     #endif
   */
 }
@@ -239,14 +238,16 @@ int getaddress() {
 void getOffset() {
   // EEPROM.get(eeAddress, calOffset);
 #ifdef SERIAL_ENABLE
-  printf("CalOffset from EEPROM: %c\n", calOffset);
+  Serial.print("CalOffset from EEPROM: ");
+  Serial.print(calOffset);
+  Serial.println();
 #endif
 }
 
 // doing a calibration of the revolver using the hall sensor
 int calibrate(bool initialCalibration) {
 #ifdef SERIAL_ENABLE
-  printf("calibrate revolver\n");
+  Serial.println("calibrate revolver");
 #endif
   currentlyrotating = 1;  // set active state to active
   bool reachedMarker = false;
@@ -270,7 +271,7 @@ int calibrate(bool initialCalibration) {
       displayedLetter = 0;
       missedSteps = 0;
 #ifdef SERIAL_ENABLE
-      printf("revolver calibrated\n");
+      Serial.println("revolver calibrated");
 #endif
       // Only stop motor for initial calibration
       if (initialCalibration) {
@@ -285,7 +286,7 @@ int calibrate(bool initialCalibration) {
       desiredLetter = 0;
       reachedMarker = true;
 #ifdef SERIAL_ENABLE
-      printf("calibration revolver failed\n");
+      Serial.println("calibration revolver failed");
 #endif
       stopMotor();
       return -1;
@@ -307,7 +308,7 @@ void stopMotor() {
   digitalWrite(STEPPERPIN3, LOW);
   digitalWrite(STEPPERPIN4, LOW);
 #ifdef SERIAL_ENABLE
-  printf("Motor Stop\n");
+  Serial.println("Motor Stop");
 #endif
   currentlyrotating = 0;  // set active state to not active
   delay(100);
@@ -315,7 +316,7 @@ void stopMotor() {
 
 void startMotor() {
 #ifdef SERIAL_ENABLE
-  printf("Motor Start\n");
+  Serial.println("Motor Start");
 #endif
   currentlyrotating = 1;  // set active state to active
   digitalWrite(STEPPERPIN1, lastInd1);
