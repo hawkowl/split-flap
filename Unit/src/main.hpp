@@ -1,11 +1,9 @@
 #pragma once
 #include <Arduino.h>
-// #include <i2c_slave.h>
 
 void receiveLetter(uint8_t reg, uint8_t length);
-void requestEvent();
+void requestEvent(uint8_t reg);
 int getaddress();
-void getOffset();
 int calibrate(bool initialCalibration);
 void stopMotor();
 void startMotor();

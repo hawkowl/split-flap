@@ -1,3 +1,5 @@
+// Based off https://github.com/davidkingsman/split-flap 's Unit.ino
+
 #include "main.hpp"
 
 #include <Arduino.h>
@@ -7,13 +9,8 @@
 #include <stdio.h>
 
 #define SERIAL_ENABLE  // uncomment for serial debug communication
-// #define TEST_ENABLE
-//   uncomment for Test mode. Rotates through a few character
-//   to make sure unit is working. These characters should be
-//   displayed in the correct order: " ", "Z", "A", "U", "N",
-//   "?", "0", "1", "2", "9"
 
-// Pins of I2C adress switch
+// Pins of I2C address switch
 #define ADRESSSW4 PC0
 #define ADRESSSW3 PD6
 #define ADRESSSW2 PD5
@@ -55,15 +52,14 @@ float missedSteps = 0;  // cummulate steps <1, to compensate via additional step
 int currentlyrotating =
     0;  // 1 = drum is currently rotating, 0 = drum is standing still
 int stepperSpeed = 10;  // current speed of stepper, value only for first homing
-int eeAddress = 0;      // EEPROM address for calibration offset
-int calOffset = 74;  // Offset for calibration in steps, stored in EEPROM, gets
-                     // read in setup
+int calOffset = 74;     // Offset for calibration in steps
 int receivedNumber = 0;
+bool doCalibrate = false;
 int i2cAddress;
 
 // sleep globals
 const unsigned long WAIT_TIME =
-    2000;  // wait time before sleep routine gets executed again in milliseconds
+    100;  // wait time before sleep routine gets executed again in milliseconds
 unsigned long previousMillis = 0;  // stores last time sleep was interrupted
 
 volatile uint8_t i2c_registers[32] = {0x00};
@@ -84,7 +80,7 @@ void setup() {
   printf("starting unit...\n");
 #endif
 
-  // i2c adress switch
+  // i2c address switch
   pinMode(ADRESSSW1, INPUT_PULLUP);
   pinMode(ADRESSSW2, INPUT_PULLUP);
   pinMode(ADRESSSW3, INPUT_PULLUP);
@@ -102,24 +98,18 @@ void setup() {
   funPinMode(PC1, GPIO_CFGLR_OUT_10Mhz_AF_OD);  // SDA
   funPinMode(PC2, GPIO_CFGLR_OUT_10Mhz_AF_OD);  // SCL
 
-  getOffset();      // get calibration offset from EEPROM
-  calibrate(true);  // home stepper after startup
-
-  // test calibration settings
-#ifdef TEST_ENABLE
-  int calLetters[10] = {0, 26, 1, 21, 14, 43, 30, 31, 32, 39};
-  for (int i = 0; i < 10; i++) {
-    int currentCalLetter = calLetters[i];
-    rotateToLetter(currentCalLetter);
-    delay(5000);
-  }
-#endif
-
   SetupI2CSlave(i2cAddress, i2c_registers, sizeof(i2c_registers), receiveLetter,
-                NULL, false);
+                requestEvent, false);
 }
 
 void loop() {
+  // If we need to recalibrate, do that now
+  if (doCalibrate) {
+    printf("Doing initial calibration\n");
+    doCalibrate = false;
+    calibrate(true);
+  }
+
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= WAIT_TIME) {
     delay(WAIT_TIME);
@@ -142,7 +132,6 @@ void rotateToLetter(int toLetter) {
   if (lastRotation == 0 ||
       (millis() - lastRotation > OVERHEATINGTIMEOUT * 1000)) {
     lastRotation = millis();
-    printf("millis %d\n", lastRotation);
     // get letter position
     int posLetter = -1;
     posLetter = toLetter;
@@ -209,23 +198,42 @@ void rotateToLetter(int toLetter) {
   }
 }
 
+int oldOffset = 0;
+
 void receiveLetter(uint8_t reg, uint8_t length) {
-  printf("Value over i2c\n");
-  receivedNumber = i2c_registers[reg];
-  // stepperSpeed = i2c_registers[reg + 1];
+  printf("reg %d over i2c, length %d\n", reg, length);
+
+  switch (reg) {
+    case 0x01:
+      receivedNumber = i2c_registers[reg];
+      printf("set recv number to %d\n", receivedNumber);
+      break;
+    case 0x02:
+      oldOffset = calOffset;
+      calOffset = i2c_registers[reg];
+      if (calOffset != oldOffset) {
+        doCalibrate = true;
+        printf("set cal offset to %d\n", calOffset);
+      }
+      break;
+    default:
+      break;
+  }
   return;
 }
 
-void requestEvent() {
-  // Wire.write(currentlyrotating);  // send unit status to master
-  /*
-    #ifdef SERIAL_ENABLE
-    Serial.print("Status ");
-    Serial.print(currentlyrotating);
-    Serial.print(" sent to master");
-    printf();
-    #endif
-  */
+void requestEvent(uint8_t reg) {
+  printf("reading value over i2c %d\n", reg);
+
+  switch (reg) {
+    case 0x03:
+      printf("rotating over i2c = %d\n", currentlyrotating);
+      i2c_registers[reg] = currentlyrotating;
+      break;
+    default:
+      break;
+  }
+  return;
 }
 
 // returns the adress of the unit as int from 0-15
@@ -233,14 +241,6 @@ int getaddress() {
   int address = !digitalRead(ADRESSSW4) + (!digitalRead(ADRESSSW3) * 2) +
                 (!digitalRead(ADRESSSW2) * 4) + (!digitalRead(ADRESSSW1) * 8);
   return address;
-}
-
-// gets magnet sensor offset from EEPROM in steps
-void getOffset() {
-  // EEPROM.get(eeAddress, calOffset);
-#ifdef SERIAL_ENABLE
-  printf("CalOffset from EEPROM: %c\n", calOffset);
-#endif
 }
 
 // doing a calibration of the revolver using the hall sensor
@@ -279,7 +279,7 @@ int calibrate(bool initialCalibration) {
       return i;
     }
     if (i > 3 * STEPS) {
-      // seems that there is a problem with the marker or the sensor. turn of
+      // seems that there is a problem with the marker or the sensor. turn off
       // the motor to avoid overheating.
       displayedLetter = 0;
       desiredLetter = 0;
