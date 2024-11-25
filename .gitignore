@@ -1,2 +1,4 @@
 .pio
 compile_commands.json
+fp-info-cache
+/**/*-backups
